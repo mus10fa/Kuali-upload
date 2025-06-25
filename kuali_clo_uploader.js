@@ -195,25 +195,132 @@ async function main() {
       "I,D,A": "Introduced, Developed & Applied"
     };
 
-    for (let i = 2; i <= worksheet.actualRowCount; i++) {
-      const row = worksheet.getRow(i);
-      const cloText = row.getCell('G').value?.toString().trim() || '';
-      const gradAttrValue = row.getCell('I').value?.toString().trim() || '';
-      const gamlRaw = row.getCell('L').value?.toString().replace(/\s/g, '') || '';
-      const gradAttrMapLevelValue = gamlMap[gamlRaw] || '';
+  let lastCourseCode = '';
+  let cloBlockIndex = 1;
+  let pendingTitles = [];
 
-      console.log(`\n▶️ Processing row ${i}...`);
+  for (let i = 2; i <= worksheet.actualRowCount; i++) {
+    const row = worksheet.getRow(i);
+    const cloText = row.getCell('G').value?.toString().trim() || '';
+    const gradAttrValue = row.getCell('I').value?.toString().trim() || '';
+    const gamlRaw = row.getCell('L').value?.toString().replace(/\s/g, '') || '';
+    const faculty = row.getCell('A').value;
+    const dept = row.getCell('C').value;
+    const code = row.getCell('D').value;
+    const courseCode = `${faculty}/${dept} ${code}`.replace(/\s+/g, ' ');
+    const gradAttrMapLevelValue = gamlMap[gamlRaw] || '';
+    const isSameCourse = courseCode === lastCourseCode;
 
+    if (!isSameCourse && lastCourseCode !== '') {
+      // === Phase 2: Input CLO titles for previous course ===
+      for (const { text, divIndex } of pendingTitles) {
+        const typed = await page.evaluate((text, divIndex) => {
+          const xpath = `//*[@id="61f570e185538c3f5de52c0b"]/div/div/div/div/div[2]/div[${divIndex}]/div/div[1]/div[1]/div[1]/input`;
+          const input = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+          if (!input) return false;
+          input.focus();
+          input.value = '';
+          for (const char of text) {
+            input.value += char;
+            input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+          }
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        }, text, divIndex);
+        console.log(typed ? `✍️ CLO block ${divIndex} titled` : `⚠️ Could not title CLO block ${divIndex}`);
+      }
+
+      // === Save Course ===
+      await clickXPath(page, '//*[@id="enrolmentNotes-input"]', 'Save (Enrolment Notes)');
+      await sleep(500); // slight buffer
+      await page.evaluate(() => {
+        const input = document.evaluate('//*[@id="enrolmentNotes-input"]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        if (input) {
+          input.focus();
+          input.value = ' ';
+          input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+      await sleep(2000);
+
+      // Reset state for next course
+      pendingTitles = [];
+      cloBlockIndex = 1;
+    }
+
+    if (!isSameCourse) {
+      console.log(`\n📘 New course: ${courseCode}`);
       await searchCourse(page, row);
       await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[1]/div/div[1]/a", "Edit");
       await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[3]/nav/ul/li[10]/div", "Lassonde Course Outcomes");
-      await clickXPath(page, "//*[@id='61f570e185538c3f5de52c0b']/div/div/div/div/div[2]/div[1]/div/div[2]/button[1]", "Add New");
-      await inputCLO(page, cloText);
-      await selectDropdownValues(page, gradAttrValue, gradAttrMapLevelValue);
-      await inputCLO(page, cloText); // reapply in case dropdowns overwrite input
-
-      summary.push({ row: i, status: '✅ Success' });
     }
+
+    const divIndex = cloBlockIndex + 1;
+    const gaiXPath = `//*[@id="61f570e185538c3f5de52c0b"]/div/div/div/div/div[2]/div[${divIndex}]/div/div[1]/div[2]/div/div[3]/div/select`;
+    const gamlXPath = `//*[@id="61f570e185538c3f5de52c0b"]/div/div/div/div/div[2]/div[${divIndex}]/div/div[1]/div[2]/div/div[4]/div/select`;
+
+    await sleep(3000);
+    await clickXPath(page, '//*[@id="61f570e185538c3f5de52c0b"]/div/div/div/div/div[2]/div[1]/div/div[2]/button[1]', "Add New CLO");
+    await sleep(1000);
+
+    const dropdownsOK = await page.evaluate((attrVal, mapVal, gaiXP, gamlXP) => {
+      function setSelect(xpath, val) {
+        const select = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        if (!select) return false;
+        const match = Array.from(select.options).find(opt =>
+          opt.textContent?.toLowerCase().includes(val.toLowerCase())
+        );
+        if (!match) return false;
+        select.value = match.value;
+        select.dispatchEvent(new Event('input', { bubbles: true }));
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      }
+      return setSelect(gaiXP, attrVal) && setSelect(gamlXP, mapVal);
+    }, gradAttrValue, gradAttrMapLevelValue, gaiXPath, gamlXPath);
+    console.log(dropdownsOK ? "✅ GAI & GAML set" : "⚠️ Dropdown set failed");
+
+    pendingTitles.push({ text: cloText, divIndex });
+    lastCourseCode = courseCode;
+    cloBlockIndex++;
+    summary.push({ row: i, course: courseCode, status: '🛠 Pending Title' });
+  }
+
+  // === Final course save & title phase ===
+  for (const { text, divIndex } of pendingTitles) {
+    const typed = await page.evaluate((text, divIndex) => {
+      const xpath = `//*[@id="61f570e185538c3f5de52c0b"]/div/div/div/div/div[2]/div[${divIndex}]/div/div[1]/div[1]/div[1]/input`;
+      const input = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+      if (!input) return false;
+      input.focus();
+      input.value = '';
+      for (const char of text) {
+        input.value += char;
+        input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      }
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }, text, divIndex);
+    console.log(typed ? `✍️ CLO block ${divIndex} titled` : `⚠️ Failed to title CLO block ${divIndex}`);
+  }
+
+  // Final save
+  await clickXPath(page, '//*[@id="enrolmentNotes-input"]', 'Save (Enrolment Notes)');
+  await sleep(500);
+  await page.evaluate(() => {
+    const input = document.evaluate('//*[@id="enrolmentNotes-input"]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+    if (input) {
+      input.focus();
+      input.value = ' ';
+      input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+  await sleep(2000);
+
+
+
 
     console.log("\n📋 Summary:");
     summary.forEach(s => console.log(`Row ${s.row}: ${s.status}`));
