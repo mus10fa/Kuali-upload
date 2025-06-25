@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Kuali Automation</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #status { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h2>Select Excel File for Kuali Automation</h2>
+  <input type="text" id="filePath" style="width:80%" readonly />
+  <button id="browseBtn">Browse</button>
+  <br><br>
+  <button id="runBtn" disabled>Run Automation</button>
+  <div id="status"></div>
+
+  <script>
+    const browseBtn = document.getElementById('browseBtn');
+    const runBtn = document.getElementById('runBtn');
+    const filePathInput = document.getElementById('filePath');
+    const statusDiv = document.getElementById('status');
+
+    browseBtn.addEventListener('click', async () => {
+      const filePath = await window.electronAPI.openFile();
+      if (filePath) {
+        filePathInput.value = filePath;
+        runBtn.disabled = false;
+        statusDiv.textContent = '';
+      }
+    });
+
+    runBtn.addEventListener('click', async () => {
+      const filePath = filePathInput.value;
+      if (!filePath) return;
+      runBtn.disabled = true;
+      statusDiv.textContent = 'Running automation... please wait.';
+      try {
+        const result = await window.electronAPI.runAutomation(filePath);
+        statusDiv.textContent = result === 'Success' ? 'Automation completed successfully!' : result;
+      } catch (err) {
+        statusDiv.textContent = 'Error: ' + err.message;
+      }
+      runBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "name": "kuali_puppeteer",
+  "version": "1.0.0",
+  "main": "kuali_clo_uploader.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "puppeteer": "^24.10.2",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "description": "",
+  "devDependencies": {
+    "electron": "^37.0.0"
+  }
+}
