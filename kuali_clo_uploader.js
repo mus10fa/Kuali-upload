@@ -52,7 +52,7 @@ async function launchBrowserOnly() {
 }
 
 async function clickXPath(page, xpath, label) {
-  await sleep(5000);
+  await sleep(7500);
   const clicked = await page.evaluate((xp) => {
     const iterator = document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
     const el = iterator.singleNodeValue;
@@ -173,16 +173,12 @@ async function main() {
 
     const { browser, page } = await launchBrowserOnly();
 
-    console.log("➡️ After logging in, press ENTER here to continue...");
-    process.stdin.resume();
-    await new Promise(resolve => process.stdin.once('data', () => {
-      process.stdin.pause();
-      resolve();
-    }));
+    await page.waitForFunction(() => !location.href.includes('passportyork.yorku.ca'), { timeout: 0 });
+    console.log("✅ Login complete. Waiting 60 seconds for full load...");
+    await sleep(60000);
 
     await clickXPath(page, "//div[contains(text(),'Curriculum')]", "Curriculum");
     await clickXPath(page, "//*[@id='app']/div/div[4]/nav/ul/li[3]/a/img", "Courses");
-
     const summary = [];
 
     const gamlMap = {
@@ -307,7 +303,7 @@ async function main() {
 
   // Final save
   await clickXPath(page, '//*[@id="enrolmentNotes-input"]', 'Save (Enrolment Notes)');
-  await sleep(500);
+  await sleep(3500);
   await page.evaluate(() => {
     const input = document.evaluate('//*[@id="enrolmentNotes-input"]', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
     if (input) {
