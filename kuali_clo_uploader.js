@@ -207,13 +207,18 @@ async function main() {
       const courseCode = `${faculty}/${dept} ${code}`.replace(/\s+/g, ' ');
 
       if (courseCode !== lastCourseCode) {
+        if (lastCourseCode) {
+          await sleep(3000); // Wait for 3 seconds before switching
+        }
+
+        await clickXPath(page, "//*[@id='app']/div/div[4]/nav/ul/li[3]/a/img", "Courses");
         console.log(`🔍 Preparing to input CLO for: ${courseCode}`);
         await searchCourse(page, courseCode);
         await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[1]/div/div[1]/a", "Edit");
         await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[3]/nav/ul/li[10]/div", "Lassonde Course Outcomes");
         lastCourseCode = courseCode;
       }
-      
+
       await inputNewCLO(page, clo, gai, gaml, rowIndex - 1);
       console.log(`✅ CLO ${rowIndex - 1} input complete.`);
     }
