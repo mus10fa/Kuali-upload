@@ -53,7 +53,7 @@ const gaiMap = {
   "1B": "01b - Demonstrate foundational knowledge of natural sciences",
   "1C": "01c - Demonstrate knowledge of engineering fundamentals",
   "1D": "01d - Demonstrate competence in specialized engineering knowledge",
-  "1E": "01e - [Placeholder for missing 1E entry]",
+  "1E": "01e - Demonstrate skills in programming, testing, and communication",
   "2A": "02a - Formulate engineering problems",
   "2B": "02b - Solve engineering problems",
   "2C": "02c - Evaluate solutions to engineering problems",
@@ -131,11 +131,9 @@ async function inputNewCLO(page, cloText = '', gaiText, gamlText) {
   }
 
   let addButtons = await page.$x("//button[@aria-label='Add outcome']");
-  if (addButtons.length === 0) {
-    throw new Error("No 'Add outcome' buttons found after clicking <span>Add New</span>");
-  }
-
+  if (addButtons.length === 0) throw new Error("No 'Add outcome' buttons found");
   const addBtn = addButtons[addButtons.length - 1];
+
   await addBtn.click();
   await sleep(1500);
   console.log('➡️ Clicked Add button. Now trying to input CLO and select dropdowns...');
@@ -156,30 +154,25 @@ async function inputNewCLO(page, cloText = '', gaiText, gamlText) {
   if (gaiRaw === '5.1') gaiRaw = '5A';
   if (gaiRaw === '5.2') gaiRaw = '5B';
   if (gaiRaw === '5.3') gaiRaw = '5C';
-  const gaiFinal = gaiRaw;
 
   console.log('📌 GAI raw:', gaiText);
-  console.log('📌 GAI final:', gaiFinal);
-  console.log('📌 GAI mapped:', gaiMap[gaiFinal]);
+  console.log('📌 GAI final:', gaiRaw);
+  console.log('📌 GAI mapped:', gaiMap[gaiRaw]);
   console.log('📌 GAML raw:', gamlText);
   console.log('📌 GAML mapped:', gamlMap[gamlText]);
 
-  await selectDropdownByLabelText(page, containerHandle, 'Graduate Attribute Indicator', gaiMap[gaiFinal]);
+  await selectDropdownByLabelText(page, containerHandle, 'Graduate Attribute Indicator', gaiMap[gaiRaw]);
   await selectDropdownByLabelText(page, containerHandle, 'Graduate Attribute Map Level', gamlMap[gamlText]);
 
   await containerHandle.dispose();
   console.log(`✅ Finished inputting CLO: ${cloText}`);
 }
 
-
-
-
-async function launchBrowserOnly() {
-  const browser = await puppeteer.launch({ headless: false, defaultViewport: null, args: ['--start-maximized'] });
-  const page = await browser.newPage();
-  await page.goto('https://york-sbx.kuali.co/cor/main/#/apps');
-  console.log("🟢 Logged in? Please log in manually if prompted.");
-  return { browser, page };
+async function clickXPath(page, xpath, label) {
+  const selector = `xpath///${xpath.replace(/^\/+/g, '')}`;
+  const element = await page.waitForSelector(selector);
+  await element.click();
+  console.log(`✅ Clicked ${label}`);
 }
 
 async function navigateToCourses(page) {
@@ -205,13 +198,6 @@ async function searchCourse(page, courseCode) {
   return true;
 }
 
-async function clickXPath(page, xpath, label) {
-  const selector = `xpath///${xpath.replace(/^\/+/g, '')}`;
-  const element = await page.waitForSelector(selector);
-  await element.click();
-  console.log(`✅ Clicked ${label}`);
-}
-
 async function main() {
   try {
     const selectedFile = await askForFile();
@@ -219,7 +205,10 @@ async function main() {
     await workbook.xlsx.readFile(selectedFile);
     const sheet = workbook.worksheets[0];
 
-    const { browser, page } = await launchBrowserOnly();
+    const browser = await puppeteer.launch({ headless: false, defaultViewport: null, args: ['--start-maximized'] });
+    const page = await browser.newPage();
+    await page.goto('https://york-sbx.kuali.co/cor/main/#/apps');
+    console.log("🟢 Logged in? Please log in manually if prompted.");
     await page.waitForFunction(() => !location.href.includes('passportyork'), { timeout: 0 });
     console.log("✅ Login complete. Waiting for page to load...");
     await sleep(60000);
@@ -227,7 +216,6 @@ async function main() {
     await navigateToCourses(page);
 
     let lastCourseCode = null;
-    let skipCount = 0;
 
     for (let rowIndex = 2; rowIndex <= sheet.rowCount; rowIndex++) {
       const row = sheet.getRow(rowIndex);
@@ -237,36 +225,26 @@ async function main() {
       const clo = row.getCell('G').value;
       const gai = row.getCell('I').value;
       const gaml = row.getCell('L').value;
-      const courseCode = `${faculty}/${dept} ${code}`.replace(/\s+/g, ' ');
+      const courseCode = `${faculty}/${dept} ${code}`.replace(/\s+/g, ' ').trim();
+      console.log(`📘 Parsed courseCode: '${courseCode}', Previous: '${lastCourseCode}'`);
+
+
 
       if (!faculty || !dept || !code) {
         console.log("⚠️ Skipping row due to missing course information.");
-        skipCount++;
-        if (skipCount > 1) {
-          console.log("Ending automation.");
-          break;
-        }
         continue;
       }
 
       if (courseCode !== lastCourseCode) {
-        if (lastCourseCode) {
-          await sleep(5000);
-        }
+        console.log(`🔄 Switching to course: ${courseCode}`);
         await clickXPath(page, "//*[@id='app']/div/div[4]/nav/ul/li[3]/a/img", "Courses");
-        console.log(`🔍 Preparing to input CLO for: ${courseCode}`);
+        await sleep(3000);
         const success = await searchCourse(page, courseCode);
-        if (!success) {
-          skipCount++;
-          if (skipCount > 2) {
-            console.log("Ending automation.");
-            break;
-          }
-          continue;
-        }
+        if (!success) continue;
         await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[1]/div/div[1]/a", "Edit");
         await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[3]/nav/ul/li[10]/div", "Lassonde Course Outcomes");
         lastCourseCode = courseCode;
+        await sleep(2000);
       }
 
       await inputNewCLO(page, clo, gai, gaml);
