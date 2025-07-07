@@ -141,6 +141,10 @@ async function navigateToCourses(page) {
 }
 
 async function searchCourse(page, courseCode) {
+  if (!courseCode || courseCode.includes("null")) {
+    console.log("⚠️ Invalid or missing course code. Skipping...");
+    return false;
+  }
   await page.waitForSelector('#search-box', { timeout: 10000 });
   await page.evaluate(() => { document.querySelector('#search-box').value = ''; });
   await page.type('#search-box', courseCode);
@@ -148,10 +152,11 @@ async function searchCourse(page, courseCode) {
   await sleep(2000);
   const firstResultXPath = "//*[@id='0_']/a";
   await clickXPath(page, firstResultXPath, "first course result");
+  return true;
 }
 
 async function clickXPath(page, xpath, label) {
-  const selector = `xpath///${xpath.replace(/^\/+/, '')}`;
+  const selector = `xpath///${xpath.replace(/^\/+/g, '')}`;
   const element = await page.waitForSelector(selector);
   await element.click();
   console.log(`✅ Clicked ${label}`);
@@ -172,6 +177,7 @@ async function main() {
     await navigateToCourses(page);
 
     let lastCourseCode = null;
+    let skipCount = 0;
 
     for (let rowIndex = 2; rowIndex <= sheet.rowCount; rowIndex++) {
       const row = sheet.getRow(rowIndex);
@@ -183,11 +189,31 @@ async function main() {
       const gaml = row.getCell('L').value;
       const courseCode = `${faculty}/${dept} ${code}`.replace(/\s+/g, ' ');
 
+      if (!faculty || !dept || !code) {
+        console.log("⚠️ Skipping row due to missing course information.");
+        skipCount++;
+        if (skipCount > 1) {
+          console.log("Ending automation.");
+          break;
+        }
+        continue;
+      }
+
       if (courseCode !== lastCourseCode) {
-        if (lastCourseCode) await sleep(3000);
+        if (lastCourseCode) {
+          await sleep(5000); // Wait before switching courses to ensure save
+        }
         await clickXPath(page, "//*[@id='app']/div/div[4]/nav/ul/li[3]/a/img", "Courses");
         console.log(`🔍 Preparing to input CLO for: ${courseCode}`);
-        await searchCourse(page, courseCode);
+        const success = await searchCourse(page, courseCode);
+        if (!success) {
+          skipCount++;
+          if (skipCount > 2) {
+            console.log("Ending automation.");
+            break;
+          }
+          continue;
+        }
         await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[1]/div/div[1]/a", "Edit");
         await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[3]/nav/ul/li[10]/div", "Lassonde Course Outcomes");
         lastCourseCode = courseCode;
