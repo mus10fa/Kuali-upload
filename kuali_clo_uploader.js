@@ -53,6 +53,7 @@ const gaiMap = {
   "1B": "01b - Demonstrate foundational knowledge of natural sciences",
   "1C": "01c - Demonstrate knowledge of engineering fundamentals",
   "1D": "01d - Demonstrate competence in specialized engineering knowledge",
+  "1E": "01e - [Placeholder for missing 1E entry]",
   "2A": "02a - Formulate engineering problems",
   "2B": "02b - Solve engineering problems",
   "2C": "02c - Evaluate solutions to engineering problems",
@@ -123,10 +124,18 @@ async function selectDropdownByLabelText(page, container, labelText, visibleOpti
 }
 
 async function inputNewCLO(page, cloText = '', gaiText, gamlText) {
-  const addButtons = await page.$x("//button[@aria-label='Add outcome']");
-  if (addButtons.length === 0) throw new Error("No 'Add outcome' buttons found");
-  const addBtn = addButtons[addButtons.length - 1];
+  const addNewSpans = await page.$x("//span[contains(text(),'Add New')]");
+  if (addNewSpans.length > 0) {
+    await addNewSpans[addNewSpans.length - 1].click();
+    await sleep(1500);
+  }
 
+  let addButtons = await page.$x("//button[@aria-label='Add outcome']");
+  if (addButtons.length === 0) {
+    throw new Error("No 'Add outcome' buttons found after clicking <span>Add New</span>");
+  }
+
+  const addBtn = addButtons[addButtons.length - 1];
   await addBtn.click();
   await sleep(1500);
   console.log('➡️ Clicked Add button. Now trying to input CLO and select dropdowns...');
@@ -141,17 +150,29 @@ async function inputNewCLO(page, cloText = '', gaiText, gamlText) {
   await cloInput.type(cloText, { delay: 75 });
   console.log(`✅ CLO input: "${cloText}"`);
 
+  let gaiRaw = String(gaiText || '').trim().toUpperCase();
+  if (gaiRaw === '1.1') gaiRaw = '1A';
+  if (gaiRaw === '1.4') gaiRaw = '1E';
+  if (gaiRaw === '5.1') gaiRaw = '5A';
+  if (gaiRaw === '5.2') gaiRaw = '5B';
+  if (gaiRaw === '5.3') gaiRaw = '5C';
+  const gaiFinal = gaiRaw;
+
   console.log('📌 GAI raw:', gaiText);
-  console.log('📌 GAI mapped:', gaiMap[gaiText?.toUpperCase()]);
+  console.log('📌 GAI final:', gaiFinal);
+  console.log('📌 GAI mapped:', gaiMap[gaiFinal]);
   console.log('📌 GAML raw:', gamlText);
   console.log('📌 GAML mapped:', gamlMap[gamlText]);
 
-  await selectDropdownByLabelText(page, containerHandle, 'Graduate Attribute Indicator', gaiMap[gaiText?.toUpperCase()]);
+  await selectDropdownByLabelText(page, containerHandle, 'Graduate Attribute Indicator', gaiMap[gaiFinal]);
   await selectDropdownByLabelText(page, containerHandle, 'Graduate Attribute Map Level', gamlMap[gamlText]);
 
   await containerHandle.dispose();
   console.log(`✅ Finished inputting CLO: ${cloText}`);
 }
+
+
+
 
 async function launchBrowserOnly() {
   const browser = await puppeteer.launch({ headless: false, defaultViewport: null, args: ['--start-maximized'] });
@@ -230,7 +251,7 @@ async function main() {
 
       if (courseCode !== lastCourseCode) {
         if (lastCourseCode) {
-          await sleep(5000); // Wait before switching courses to ensure save
+          await sleep(5000);
         }
         await clickXPath(page, "//*[@id='app']/div/div[4]/nav/ul/li[3]/a/img", "Courses");
         console.log(`🔍 Preparing to input CLO for: ${courseCode}`);
