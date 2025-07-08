@@ -127,7 +127,7 @@ async function inputNewCLO(page, cloText = '', gaiText, gamlText) {
   const addNewSpans = await page.$x("//span[contains(text(),'Add New')]");
   if (addNewSpans.length > 0) {
     await addNewSpans[addNewSpans.length - 1].click();
-    await sleep(1500);
+    await page.waitForXPath("//button[@aria-label='Add outcome']", { timeout: 3000 });
   }
 
   let addButtons = await page.$x("//button[@aria-label='Add outcome']");
@@ -135,7 +135,7 @@ async function inputNewCLO(page, cloText = '', gaiText, gamlText) {
   const addBtn = addButtons[addButtons.length - 1];
 
   await addBtn.click();
-  await sleep(1500);
+  await page.waitForSelector('input.form-control', { timeout: 3000 });
   console.log('➡️ Clicked Add button. Now trying to input CLO and select dropdowns...');
 
   const containerHandle = await addBtn.evaluateHandle(btn => btn.closest('div[style*="flex"]'));
@@ -143,10 +143,20 @@ async function inputNewCLO(page, cloText = '', gaiText, gamlText) {
 
   const cloInput = await containerHandle.asElement().$('input.form-control');
   if (!cloInput) throw new Error("CLO input not found");
-  await cloInput.click({ clickCount: 3 });
-  await page.keyboard.press('Backspace');
-  await cloInput.type(cloText, { delay: 75 });
-  console.log(`✅ CLO input: "${cloText}"`);
+
+  // Fast paste input value
+  await page.evaluate((input, value) => {
+    input.value = '';
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, cloInput, cloText);
+
+  // Simulate space keypress to trigger key-related listeners
+  await cloInput.focus();
+  await page.keyboard.press('Space');
+
+  console.log(`✅ CLO input pasted: "${cloText}"`);
 
   let gaiRaw = String(gaiText || '').trim().toUpperCase();
 
