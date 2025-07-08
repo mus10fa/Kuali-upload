@@ -149,11 +149,6 @@ async function inputNewCLO(page, cloText = '', gaiText, gamlText) {
   console.log(`✅ CLO input: "${cloText}"`);
 
   let gaiRaw = String(gaiText || '').trim().toUpperCase();
-  if (gaiRaw === '1.1') gaiRaw = '1A';
-  if (gaiRaw === '1.4') gaiRaw = '1E';
-  if (gaiRaw === '5.1') gaiRaw = '5A';
-  if (gaiRaw === '5.2') gaiRaw = '5B';
-  if (gaiRaw === '5.3') gaiRaw = '5C';
 
   console.log('📌 GAI raw:', gaiText);
   console.log('📌 GAI final:', gaiRaw);
@@ -223,7 +218,7 @@ async function main() {
       const dept = row.getCell('C').value;
       const code = row.getCell('D').value;
       const clo = row.getCell('G').value;
-      const gai = row.getCell('I').value;
+      const gai = String(row.getCell('I').text).trim();
       const gaml = row.getCell('L').value;
       const courseCode = `${faculty}/${dept} ${code}`.replace(/\s+/g, ' ').trim();
       console.log(`📘 Parsed courseCode: '${courseCode}', Previous: '${lastCourseCode}'`);
