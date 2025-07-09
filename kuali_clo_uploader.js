@@ -86,6 +86,61 @@ const gaiMap = {
   "12C": "12c - Develop goals and long term plans for continued learning to maintain professional standing and adapt to a changing world"
 };
 
+// Add this function to delete all existing CLOs
+async function deleteAllExistingCLOs(page) {
+  console.log("🗑️ Starting to delete all existing CLOs...");
+  
+  try {
+    // Check if we need to delete anything
+    const addNewSpans = await page.$x("//span[contains(text(),'Add New')]");
+    if (addNewSpans.length > 0) {
+      console.log("✅ No existing CLOs to delete - 'Add New' button is already visible");
+      return;
+    }
+    
+    // Keep deleting until the "Add New" button appears
+    let deletionCount = 0;
+    let continueDeleting = true;
+    
+    while (continueDeleting) {
+      // Find all delete buttons with the trash icon
+      const deleteButtonXPath = "//button[.//i[contains(@class, 'fa-trash')]]";
+      const deleteButtons = await page.$x(deleteButtonXPath);
+      
+      if (deleteButtons.length === 0) {
+        console.log("❓ No more delete buttons found, but 'Add New' not visible yet");
+        break;
+      }
+      
+      // Click the last delete button
+      const lastDeleteButton = deleteButtons[deleteButtons.length - 1];
+      await lastDeleteButton.click();
+      deletionCount++;
+      console.log(`🗑️ Deleted CLO #${deletionCount}`);
+      
+      // Wait for deletion to complete
+      await sleep(1000);
+      
+      // Check if "Add New" button has appeared
+      const newAddNewSpans = await page.$x("//span[contains(text(),'Add New')]");
+      if (newAddNewSpans.length > 0) {
+        console.log("✅ 'Add New' button is now visible. All CLOs deleted.");
+        continueDeleting = false;
+      }
+      
+      // Safety check to prevent infinite loops
+      if (deletionCount > 100) {
+        console.log("⚠️ Safety limit reached (100 deletions). Breaking loop.");
+        break;
+      }
+    }
+    
+    console.log(`✅ Finished deleting ${deletionCount} CLOs`);
+  } catch (error) {
+    console.error("❌ Error while deleting CLOs:", error);
+  }
+}
+
 async function selectDropdownByLabelText(page, container, labelText, visibleOptionText) {
   if (!visibleOptionText) {
     console.log(`⚠️ No value provided to select for label "${labelText}"`);
@@ -259,10 +314,14 @@ async function main() {
       await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[3]/nav/ul/li[10]/div", "Lassonde Course Outcomes");
       await sleep(2000);
 
+      // Delete all existing CLOs before adding new ones
+      await deleteAllExistingCLOs(page);
+      
       // Add all CLOs for this course
       for (const rowData of courseGroups[courseCode]) {
         await inputNewCLO(page, rowData.clo, rowData.gai, rowData.gaml);
       }
+    
 
       // Delete the last CLO for this course
       const deleteButtonXPath = "//button[.//i[contains(@class, 'fa-trash')]]";
