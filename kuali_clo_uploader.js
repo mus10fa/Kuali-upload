@@ -119,7 +119,7 @@ async function deleteAllExistingCLOs(page) {
       console.log(`🗑️ Deleted CLO #${deletionCount}`);
       
       // Wait for deletion to complete
-      await sleep(1000);
+      await sleep(1);
       
       // Check if "Add New" button has appeared
       const newAddNewSpans = await page.$x("//span[contains(text(),'Add New')]");
@@ -230,7 +230,7 @@ async function inputNewCLO(page, cloText = '', gaiText, gamlText) {
 
 async function clickXPath(page, xpath, label) {
   const selector = `xpath///${xpath.replace(/^\/+/g, '')}`;
-  const element = await page.waitForSelector(selector);
+  const element = await page.waitForSelector(selector, { timeout: 60000 });
   await element.click();
   console.log(`✅ Clicked ${label}`);
 }
@@ -238,7 +238,7 @@ async function clickXPath(page, xpath, label) {
 async function navigateToCourses(page) {
   const curriculumXPath = '//*[@id="mainContent"]/div[1]/div/ul/li[1]/div[2]';
   await clickXPath(page, curriculumXPath, 'Curriculum');
-  await sleep(3000);
+  await sleep(1000);
   const coursesXPath = "//*[@id='app']/div/div[4]/nav/ul/li[3]/a/img";
   await clickXPath(page, coursesXPath, "Courses");
 }
@@ -252,7 +252,7 @@ async function searchCourse(page, courseCode) {
   await page.evaluate(() => { document.querySelector('#search-box').value = ''; });
   await page.type('#search-box', courseCode);
   console.log(`🔍 Searched for course: ${courseCode}`);
-  await sleep(2000);
+  await sleep(1000);
   const firstResultXPath = "//*[@id='0_']/a";
   await clickXPath(page, firstResultXPath, "first course result");
   return true;
@@ -271,7 +271,7 @@ async function main() {
     console.log("🟢 Logged in? Please log in manually if prompted.");
     await page.waitForFunction(() => !location.href.includes('passportyork'), { timeout: 0 });
     console.log("✅ Login complete. Waiting for page to load...");
-    await sleep(6000);
+    await sleep(15000);
 
     await navigateToCourses(page);
 
@@ -307,12 +307,12 @@ async function main() {
     for (const courseCode in courseGroups) {
       console.log(`🔄 Switching to course: ${courseCode}`);
       await clickXPath(page, "//*[@id='app']/div/div[4]/nav/ul/li[3]/a/img", "Courses");
-      await sleep(3000);
+      await sleep(1000);
       const success = await searchCourse(page, courseCode);
       if (!success) continue;
       await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[1]/div/div[1]/a", "Edit");
       await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[3]/nav/ul/li[10]/div", "Lassonde Course Outcomes");
-      await sleep(2000);
+      await sleep(1000);
 
       // Delete all existing CLOs before adding new ones
       await deleteAllExistingCLOs(page);
