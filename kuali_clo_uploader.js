@@ -216,46 +216,68 @@ async function main() {
     console.log("🟢 Logged in? Please log in manually if prompted.");
     await page.waitForFunction(() => !location.href.includes('passportyork'), { timeout: 0 });
     console.log("✅ Login complete. Waiting for page to load...");
-    await sleep(60000);
+    await sleep(6000);
 
     await navigateToCourses(page);
 
     let lastCourseCode = null;
+    let currentCourseRows = [];
 
+    // First, group all rows by course code
+    const courseGroups = {};
     for (let rowIndex = 2; rowIndex <= sheet.rowCount; rowIndex++) {
       const row = sheet.getRow(rowIndex);
       const faculty = row.getCell('A').value;
       const dept = row.getCell('C').value;
       const code = row.getCell('D').value;
-      const clo = row.getCell('G').value;
-      const gai = String(row.getCell('I').text).trim();
-      const gaml = row.getCell('L').value;
-      const courseCode = `${faculty}/${dept} ${code}`.replace(/\s+/g, ' ').trim();
-      console.log(`📘 Parsed courseCode: '${courseCode}', Previous: '${lastCourseCode}'`);
-
-
-
+      
       if (!faculty || !dept || !code) {
-        console.log("⚠️ Skipping row due to missing course information.");
+        console.log(`⚠️ Skipping row ${rowIndex} due to missing course information.`);
         continue;
       }
-
-      if (courseCode !== lastCourseCode) {
-        console.log(`🔄 Switching to course: ${courseCode}`);
-        await clickXPath(page, "//*[@id='app']/div/div[4]/nav/ul/li[3]/a/img", "Courses");
-        await sleep(3000);
-        const success = await searchCourse(page, courseCode);
-        if (!success) continue;
-        await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[1]/div/div[1]/a", "Edit");
-        await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[3]/nav/ul/li[10]/div", "Lassonde Course Outcomes");
-        lastCourseCode = courseCode;
-        await sleep(2000);
+      
+      const courseCode = `${faculty}/${dept} ${code}`.replace(/\s+/g, ' ').trim();
+      if (!courseGroups[courseCode]) {
+        courseGroups[courseCode] = [];
       }
-
-      await inputNewCLO(page, clo, gai, gaml);
+      courseGroups[courseCode].push({
+        rowIndex,
+        clo: row.getCell('G').value,
+        gai: String(row.getCell('I').text).trim(),
+        gaml: row.getCell('L').value
+      });
     }
 
-    console.log("✅ All CLOs input complete. Ready for review.");
+    // Now process each course
+    for (const courseCode in courseGroups) {
+      console.log(`🔄 Switching to course: ${courseCode}`);
+      await clickXPath(page, "//*[@id='app']/div/div[4]/nav/ul/li[3]/a/img", "Courses");
+      await sleep(3000);
+      const success = await searchCourse(page, courseCode);
+      if (!success) continue;
+      await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[1]/div/div[1]/a", "Edit");
+      await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[3]/nav/ul/li[10]/div", "Lassonde Course Outcomes");
+      await sleep(2000);
+
+      // Add all CLOs for this course
+      for (const rowData of courseGroups[courseCode]) {
+        await inputNewCLO(page, rowData.clo, rowData.gai, rowData.gaml);
+      }
+
+      // Delete the last CLO for this course
+      const deleteButtonXPath = "//button[.//i[contains(@class, 'fa-trash')]]";
+      const deleteButtons = await page.$x(deleteButtonXPath);
+      if (deleteButtons.length > 0) {
+        const lastDeleteButton = deleteButtons[deleteButtons.length - 1];
+        await lastDeleteButton.click();
+        console.log(`✅ Deleted the last CLO for ${courseCode}.`);
+        await sleep(1000); // Wait for deletion to complete
+      } else {
+        console.log(`⚠️ No delete buttons found for ${courseCode}.`);
+      }
+    }
+
+    console.log("✅ All courses processed. Ready for review.");
   } catch (err) {
     console.error("❌ Error in automation:", err);
   }
