@@ -236,10 +236,10 @@ async function clickXPath(page, xpath, label) {
 }
 
 async function navigateToCourses(page) {
-  const curriculumXPath = '//*[@id="mainContent"]/div[1]/div/ul/li[1]/div[2]';
+  const curriculumXPath = "//div[contains(@class, 'app-switcher-app-name') and normalize-space(text())='Curriculum']";
   await clickXPath(page, curriculumXPath, 'Curriculum');
   await sleep(1000);
-  const coursesXPath = "//*[@id='app']/div/div[4]/nav/ul/li[3]/a/img";
+  const coursesXPath = "//span[contains(@class, 'src-common-side-nav-styles-module__linkText') and normalize-space(text())='Courses']";
   await clickXPath(page, coursesXPath, "Courses");
 }
 
@@ -270,7 +270,6 @@ async function main() {
     await page.goto('https://york-sbx.kuali.co/cor/main/#/apps');
     console.log("🟢 Logged in? Please log in manually if prompted.");
     await page.waitForFunction(() => !location.href.includes('passportyork'), { timeout: 0 });
-    console.log("✅ Login complete. Waiting for page to load...");
     await sleep(15000);
 
     await navigateToCourses(page);
@@ -305,13 +304,13 @@ async function main() {
 
     // Now process each course
     for (const courseCode in courseGroups) {
-      console.log(`🔄 Switching to course: ${courseCode}`);
-      await clickXPath(page, "//*[@id='app']/div/div[4]/nav/ul/li[3]/a/img", "Courses");
+      console.log(`🔄 Course: ${courseCode}`);
+      await clickXPath(page, "//span[contains(@class, 'src-common-side-nav-styles-module__linkText') and normalize-space(text())='Courses']", "Courses");
       await sleep(1000);
       const success = await searchCourse(page, courseCode);
       if (!success) continue;
-      await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[1]/div/div[1]/a", "Edit");
-      await clickXPath(page, "//*[@id='app']/div/div[4]/div/main/div/div[3]/div[1]/div/div[3]/nav/ul/li[10]/div", "Lassonde Course Outcomes");
+      await clickXPath(page, "//a[@data-test='edit' and contains(normalize-space(.), 'Edit')]", "Edit");
+      await clickXPath(page, "//div[contains(@class, '_item-action-menu-table-of-contents-styles-module__button') and normalize-space(text())='Lassonde Course Outcomes']", "Lassonde Course Outcomes");
       await sleep(1000);
 
       // Delete all existing CLOs before adding new ones
