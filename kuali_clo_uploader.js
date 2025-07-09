@@ -329,7 +329,6 @@ async function main() {
       if (deleteButtons.length > 0) {
         const lastDeleteButton = deleteButtons[deleteButtons.length - 1];
         await lastDeleteButton.click();
-        console.log(`✅ Deleted the last CLO for ${courseCode}.`);
         await sleep(1000); // Wait for deletion to complete
       } else {
         console.log(`⚠️ No delete buttons found for ${courseCode}.`);
