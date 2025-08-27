@@ -286,7 +286,6 @@ async function main() {
       const code = row.getCell('D').value;
       
       if (!faculty || !dept || !code) {
-        console.log(`⚠️ Skipping row ${rowIndex} due to missing course information.`);
         continue;
       }
       
